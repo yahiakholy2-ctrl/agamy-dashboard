@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Agamy Project – Performance Dashboard</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box}
+body{font-family:'Inter',sans-serif;background:#FAF8F5;color:#1C1310;min-height:100vh}
+:root{--or:#FF5A00;--or2:#FF8C42;--br:#4A3525;--br2:#7A5C42;--card:#fff;--bdr:#EDE8E2;--muted:#9B8B7A}
+.card{background:var(--card);border:1px solid var(--bdr);border-radius:16px;box-shadow:0 2px 12px rgba(74,53,37,.06);transition:box-shadow .2s,transform .2s}
+.card:hover{box-shadow:0 6px 24px rgba(74,53,37,.13);transform:translateY(-2px)}
+.kpi-click{cursor:pointer;position:relative;overflow:hidden;border-radius:16px;padding:20px 22px;color:#fff;transition:transform .18s,box-shadow .18s}
+.kpi-click:hover{transform:translateY(-3px) scale(1.02);box-shadow:0 10px 30px rgba(0,0,0,.25)}
+.kpi-click:active{transform:scale(.97)}
+.kpi-click::after{content:'';position:absolute;top:-16px;right:-16px;width:64px;height:64px;border-radius:50%;background:rgba(255,255,255,.1)}
+.kpi-click .hint{position:absolute;bottom:8px;right:12px;font-size:10px;font-weight:600;opacity:.55;letter-spacing:.05em}
+.kpi-pill{background:var(--card);border:1.5px solid var(--bdr);border-radius:12px;padding:13px 15px;cursor:pointer;transition:all .18s;position:relative}
+.kpi-pill:hover{border-color:var(--or);box-shadow:0 4px 16px rgba(255,90,0,.15);transform:translateY(-2px)}
+.kpi-pill:hover::after{content:'↗';position:absolute;top:9px;right:11px;font-size:10px;color:var(--or)}
+
+/* OVERLAYS */
+.overlay{display:none;position:fixed;inset:0;background:rgba(26,12,4,.55);backdrop-filter:blur(6px);z-index:1000;align-items:center;justify-content:center;padding:16px}
+.overlay.open{display:flex}
+.modal-box{background:#fff;border-radius:20px;width:100%;max-width:820px;max-height:92vh;overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,.3);animation:slideUp .22s ease}
+.panel-box{background:#fff;border-radius:20px;width:100%;max-width:1100px;max-height:94vh;overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,.3);animation:slideUp .22s ease}
+@keyframes slideUp{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
+.mhdr{padding:20px 26px 14px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:0;background:#fff;z-index:2;border-radius:20px 20px 0 0}
+.mbody{padding:22px 26px}
+.close-btn{width:32px;height:32px;border-radius:50%;border:1.5px solid var(--bdr);background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--br);transition:all .15s;flex-shrink:0}
+.close-btn:hover{background:var(--or);color:#fff;border-color:var(--or)}
+
+/* FORMS */
+select,input[type=text],input[type=number]{appearance:none;background-color:#fff;padding:9px 13px;border:1.5px solid var(--bdr);border-radius:9px;color:var(--br);font-family:'Inter',sans-serif;font-size:13px;font-weight:500;outline:none;cursor:pointer;transition:border-color .2s;width:100%}
+select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%234A3525' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:36px}
+select:focus,input:focus{border-color:var(--or);box-shadow:0 0 0 3px rgba(255,90,0,.1)}
+.btn{padding:9px 20px;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;border:none;transition:all .18s;font-family:'Inter',sans-serif}
+.btn-or{background:var(--or);color:#fff}.btn-or:hover{background:#CC4400}
+.btn-br{background:var(--br);color:#fff}.btn-br:hover{background:#2D1E13}
+.btn-ghost{background:transparent;border:1.5px solid var(--bdr);color:var(--br)}.btn-ghost:hover{border-color:var(--or);color:var(--or)}
+.btn-green{background:#15803D;color:#fff}.btn-green:hover{background:#0F5C2E}
+
+/* MISC */
+.badge{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px}
+.up{background:#DCFCE7;color:#15803D}.dn{background:#FEE2E2;color:#DC2626}.neu{background:#FEF9C3;color:#A16207}
+.eyebrow{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--or);margin-bottom:4px}
+.filter-bar{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;background:#fff;border:1px solid var(--bdr);border-radius:14px;padding:15px 20px}
+.fg{display:flex;flex-direction:column;min-width:170px;flex:1}
+label.flt{display:block;font-size:10px;font-weight:700;color:var(--br2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px}
+.divider{border:none;border-top:1px solid var(--bdr);margin:26px 0}
+.tab-btn{padding:6px 15px;border-radius:999px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid var(--bdr);background:#fff;color:var(--muted);transition:all .2s}
+.tab-btn.active{background:var(--or);color:#fff;border-color:var(--or)}
+.or-grad{background:linear-gradient(135deg,#FF5A00,#FF8C42)}
+.br-grad{background:linear-gradient(135deg,#4A3525,#7A5C42)}
+.dk-grad{background:linear-gradient(135deg,#2D1E13,#5A3D28)}
+.tl-grad{background:linear-gradient(135deg,#0D7377,#14A085)}
+.stat-chip{background:#FAF8F5;border:1px solid var(--bdr);border-radius:10px;padding:10px 13px;flex:1;min-width:90px}
+
+/* ADMIN TABLE */
+.adm-table{width:100%;border-collapse:collapse;font-size:12px}
+.adm-table th{padding:8px 10px;background:#FAF8F5;border-bottom:2px solid var(--bdr);text-align:left;font-weight:700;color:var(--br2);white-space:nowrap}
+.adm-table td{padding:6px 8px;border-bottom:1px solid var(--bdr)}
+.adm-table input{padding:5px 8px;font-size:12px;border-radius:6px;width:100%;min-width:80px}
+.adm-table tr:hover td{background:#FFFAF7}
+.tag{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;margin:1px}
+
+/* TOAST */
+#toast{position:fixed;bottom:28px;right:28px;background:#15803D;color:#fff;padding:12px 20px;border-radius:12px;font-size:13px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.2);z-index:9999;display:none;animation:slideUp .2s ease}
+
+/* IMPORT ZONE */
+.drop-zone{border:2px dashed var(--bdr);border-radius:14px;padding:32px;text-align:center;transition:all .2s;cursor:pointer}
+.drop-zone.drag{border-color:var(--or);background:#FFF5EF}
+.drop-zone:hover{border-color:var(--or)}
+</style>
+</head>
+<body>
+
+<!-- TOAST -->
+<div id="toast">✅ Data updated successfully!</div>
+
+<!-- ══ HEADER ══ -->
+<div style="background:linear-gradient(135deg,#3A2818,#5A3D28,#3A2818);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+  <div style="display:flex;align-items:center;gap:12px">
+    <div style="width:34px;height:34px;background:var(--or);border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+      <svg width="16" height="16" fill="none" stroke="#fff" stroke-width="2.2" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+    </div>
+    <div>
+      <p style="color:rgba(255,255,255,.5);font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin:0">Talabat · Agamy Zone</p>
+      <h1 style="color:#fff;font-size:17px;font-weight:900;margin:0">Agamy Project Performance Dashboard</h1>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+    <div style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);border-radius:999px;padding:5px 13px;font-size:12px;color:rgba(255,255,255,.8);font-weight:500"><span style="color:#FF5A00;font-weight:800" id="hdr-chains">—</span> Chains</div>
+    <div style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);border-radius:999px;padding:5px 13px;font-size:12px;color:rgba(255,255,255,.8);font-weight:500"><span style="color:#FF5A00;font-weight:800" id="hdr-vendors">—</span> Vendors</div>
+    <!-- ADMIN BUTTON -->
+    <!-- SAVE DATA -->
+    <button class="btn" style="background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.25);display:flex;align-items:center;gap:5px;padding:7px 14px" onclick="saveDataToFile()" title="حفظ البيانات كـ JSON">
+      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+      حفظ
+    </button>
+    <!-- LOAD DATA -->
+    <button class="btn" style="background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.25);display:flex;align-items:center;gap:5px;padding:7px 14px" onclick="document.getElementById('loadJsonInput').click()" title="تحميل بيانات محفوظة">
+      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      تحميل
+    </button>
+    <input type="file" id="loadJsonInput" accept=".json" style="display:none" onchange="loadDataFromFile(this)"/>
+    <!-- ADMIN -->
+    <button class="btn btn-or" style="display:flex;align-items:center;gap:6px;padding:7px 16px" onclick="openAdmin()">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      تحديث البيانات
+    </button>
+  </div>
+</div>
+
+<div style="max-width:1320px;margin:0 auto;padding:22px 16px">
+
+<!-- GLOBAL FILTER -->
+<div class="filter-bar" style="margin-bottom:22px">
+  <div class="fg" style="max-width:260px">
+    <label class="flt">📅 Select Month</label>
+    <select id="globalMonth">
+      <option value="All">All Months</option>
+    </select>
+  </div>
+  <p style="font-size:12px;color:var(--muted);padding-bottom:2px;margin:0">💡 اضغط على أي كارت لعرض تفاصيله · اضغط "تحديث البيانات" لتغيير الأرقام</p>
+</div>
+
+<!-- HERO KPIs -->
+<p class="eyebrow">Overall Performance</p>
+<h2 style="font-size:18px;font-weight:900;color:var(--br);margin:0 0 14px">Key Performance Indicators</h2>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(195px,1fr));gap:12px;margin-bottom:12px" id="hero-kpis"></div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:24px" id="sec-kpis"></div>
+
+<!-- GROWTH CHART -->
+<div class="card" style="padding:22px;margin-bottom:24px">
+  <p class="eyebrow">Growth Trend</p>
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px">
+    <h2 style="font-size:15px;font-weight:800;color:var(--br);margin:0" id="macroChartTitle">Orders vs GMV</h2>
+    <div style="display:flex;gap:6px">
+      <button class="tab-btn active" id="btnBoth" onclick="setMetric('both')">Both</button>
+      <button class="tab-btn" id="btnOrders" onclick="setMetric('orders')">Orders</button>
+      <button class="tab-btn" id="btnGmv" onclick="setMetric('gmv')">GMV</button>
+    </div>
+  </div>
+  <div style="position:relative;height:270px"><canvas id="macroChart"></canvas></div>
+</div>
+
+<hr class="divider"/>
+
+<!-- RESTAURANT DEEP-DIVE -->
+<p class="eyebrow">Restaurant Analysis</p>
+<h2 style="font-size:18px;font-weight:900;color:var(--br);margin:0 0 14px">Restaurant Deep-Dive</h2>
+<div class="filter-bar" style="margin-bottom:16px">
+  <div class="fg">
+    <label class="flt">🍽️ Restaurant / Chain</label>
+    <select id="filterChain"></select>
+  </div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:10px;margin-bottom:18px" id="resto-kpis"></div>
+<div style="display:grid;grid-template-columns:1fr 2fr;gap:14px;margin-bottom:16px">
+  <div class="card" style="padding:18px">
+    <p class="eyebrow">Funding Split</p>
+    <h3 style="font-size:13px;font-weight:700;color:var(--br);margin:0 0 12px">Funded vs Non-Funded</h3>
+    <div style="position:relative;height:190px;display:flex;align-items:center;justify-content:center"><canvas id="donutChart"></canvas></div>
+    <div id="donutLegend" style="display:flex;gap:10px;justify-content:center;margin-top:10px;flex-wrap:wrap;font-size:11px;font-weight:600;color:var(--br)"></div>
+  </div>
+  <div class="card" style="padding:18px">
+    <p class="eyebrow">Competitive Ranking</p>
+    <h3 style="font-size:13px;font-weight:700;color:var(--br);margin:0 0 12px" id="compTitle">Top Restaurants</h3>
+    <div style="position:relative;height:240px"><canvas id="barChart"></canvas></div>
+  </div>
+</div>
+
+<!-- TABLE -->
+<div class="card" style="padding:18px">
+  <p class="eyebrow">Full Leaderboard</p>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+    <h3 style="font-size:13px;font-weight:800;color:var(--br);margin:0" id="tableTitle">All Restaurants</h3>
+    <input id="tableSearch" type="text" placeholder="🔍 Search…" oninput="renderTable()" style="min-width:190px;max-width:240px"/>
+  </div>
+  <div style="overflow-x:auto">
+    <table class="adm-table" id="restoTable">
+      <thead><tr id="tableHead"></tr></thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+  <p style="font-size:11px;color:var(--muted);margin-top:8px" id="tableCount"></p>
+</div>
+
+<div style="margin-top:28px;text-align:center;color:var(--muted);font-size:11px" id="dataStamp">Data: January – August 2026 · Agamy Zone · Talabat Egypt</div>
+</div>
+
+<!-- ══ MODAL: KPI DETAIL ══ -->
+<div class="overlay" id="kpiModal" onclick="closeKpiModal(event)">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="mhdr">
+      <div><div class="eyebrow" id="modalEyebrow">Metric Detail</div><h2 style="font-size:17px;font-weight:900;color:var(--br);margin:4px 0 0" id="modalTitle">—</h2></div>
+      <button class="close-btn" onclick="closeKpiModal({target:document.getElementById('kpiModal')})">✕</button>
+    </div>
+    <div class="mbody">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px" id="modalStats"></div>
+      <div style="position:relative;height:250px;margin-bottom:16px"><canvas id="modalChart"></canvas></div>
+      <div style="background:#FAF8F5;border:1px solid var(--bdr);border-radius:12px;padding:13px 15px" id="modalInsight"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ ADMIN PANEL ══ -->
+<div class="overlay" id="adminPanel" onclick="closeAdmin(event)">
+  <div class="panel-box" onclick="event.stopPropagation()">
+    <div class="mhdr">
+      <div>
+        <div class="eyebrow">Data Management</div>
+        <h2 style="font-size:17px;font-weight:900;color:var(--br);margin:4px 0 0">تحديث البيانات</h2>
+      </div>
+      <button class="close-btn" onclick="closeAdmin({target:document.getElementById('adminPanel')})">✕</button>
+    </div>
+    <div class="mbody">
+
+      <!-- TABS -->
+      <div style="display:flex;gap:8px;margin-bottom:22px;border-bottom:2px solid var(--bdr);padding-bottom:0">
+        <button class="tab-btn active" id="tabImport" onclick="switchAdminTab('import')" style="border-radius:8px 8px 0 0;border-bottom:none;margin-bottom:-2px">📂 رفع Excel/CSV</button>
+        <button class="tab-btn" id="tabManual" onclick="switchAdminTab('manual')" style="border-radius:8px 8px 0 0;border-bottom:none;margin-bottom:-2px">✏️ تعديل يدوي</button>
+        <button class="tab-btn" id="tabAddMonth" onclick="switchAdminTab('addmonth')" style="border-radius:8px 8px 0 0;border-bottom:none;margin-bottom:-2px">➕ إضافة شهر جديد</button>
+      </div>
+
+      <!-- TAB: IMPORT -->
+      <div id="tabImportContent">
+        <p style="font-size:13px;color:var(--muted);margin:0 0 16px">ارفع ملف Excel أو CSV — الداشبورد هيقرأ الأرقام ويتحدث أوتوماتيك.</p>
+
+        <!-- Format guide -->
+        <div style="background:#FFF5EF;border:1px solid #FFD4B8;border-radius:12px;padding:14px 16px;margin-bottom:18px">
+          <p style="font-size:12px;font-weight:700;color:var(--or);margin:0 0 8px">📋 تنسيق الملف المطلوب:</p>
+          <p style="font-size:12px;color:var(--br);margin:0 0 6px"><strong>للبيانات الشهرية (Macro):</strong> اعمل Sheet اسمه <code>Growth mom</code> — الأعمدة:</p>
+          <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">
+            <span class="tag" style="background:#FFE5D0;color:#CC4400">Month</span>
+            <span class="tag" style="background:#FFE5D0;color:#CC4400">Successful</span>
+            <span class="tag" style="background:#FFE5D0;color:#CC4400">GMV</span>
+            <span class="tag" style="background:#FFE5D0;color:#CC4400">AOV</span>
+            <span class="tag" style="background:#FFE5D0;color:#CC4400">AFV</span>
+            <span class="tag" style="background:#FFE5D0;color:#CC4400">Avg. Delivery Fees</span>
+            <span class="tag" style="background:#FFE5D0;color:#CC4400">Funded Orders %</span>
+            <span class="tag" style="background:#FFE5D0;color:#CC4400">Talabat Funded orders %</span>
+            <span class="tag" style="background:#FFE5D0;color:#CC4400">Vendor Funded Orders %</span>
+            <span class="tag" style="background:#FFE5D0;color:#CC4400">Vendor FR %</span>
+            <span class="tag" style="background:#FFE5D0;color:#CC4400">TGO share</span>
+            <span class="tag" style="background:#FFE5D0;color:#CC4400">Avg Daily Orders</span>
+            <span class="tag" style="background:#FFE5D0;color:#CC4400">Avg. Daily GMV</span>
+            <span class="tag" style="background:#FFE5D0;color:#CC4400">Number of Active Chains</span>
+            <span class="tag" style="background:#FFE5D0;color:#CC4400">Number of Active Vendors</span>
+          </div>
+          <p style="font-size:12px;color:var(--br);margin:0 0 6px"><strong>للمطاعم (Chains):</strong> Sheet اسمه <code>Chains Contribution</code> — الأعمدة:</p>
+          <div style="display:flex;flex-wrap:wrap;gap:4px">
+            <span class="tag" style="background:#E0F0FF;color:#1A5DA0">chain_name</span>
+            <span class="tag" style="background:#E0F0FF;color:#1A5DA0">Successful</span>
+            <span class="tag" style="background:#E0F0FF;color:#1A5DA0">GMV</span>
+            <span class="tag" style="background:#E0F0FF;color:#1A5DA0">AOV</span>
+            <span class="tag" style="background:#E0F0FF;color:#1A5DA0">AFV</span>
+            <span class="tag" style="background:#E0F0FF;color:#1A5DA0">Avg. Delivery Fees</span>
+            <span class="tag" style="background:#E0F0FF;color:#1A5DA0">Funded Orders %</span>
+            <span class="tag" style="background:#E0F0FF;color:#1A5DA0">Talabat Funded orders %</span>
+            <span class="tag" style="background:#E0F0FF;color:#1A5DA0">Vendor Funded Orders %</span>
+            <span class="tag" style="background:#E0F0FF;color:#1A5DA0">Vendor FR %</span>
+            <span class="tag" style="background:#E0F0FF;color:#1A5DA0">TGO share</span>
+            <span class="tag" style="background:#E0F0FF;color:#1A5DA0">Orders Contribution %</span>
+            <span class="tag" style="background:#E0F0FF;color:#1A5DA0">Avg Daily Orders</span>
+            <span class="tag" style="background:#E0F0FF;color:#1A5DA0">Avg Daily GMV</span>
+          </div>
+        </div>
+
+        <!-- Drop zone -->
+        <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()"
+          ondragover="event.preventDefault();this.classList.add('drag')"
+          ondragleave="this.classList.remove('drag')"
+          ondrop="handleDrop(event)">
+          <div style="font-size:36px;margin-bottom:10px">📂</div>
+          <p style="font-size:15px;font-weight:700;color:var(--br);margin:0 0 4px">اسحب الملف هنا أو اضغط للاختيار</p>
+          <p style="font-size:12px;color:var(--muted);margin:0">يدعم: .xlsx · .xls · .csv</p>
+          <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleFileInput(this)"/>
+        </div>
+        <div id="importStatus" style="margin-top:14px;display:none;background:#F0FDF4;border:1px solid #86EFAC;border-radius:10px;padding:12px 14px;font-size:13px;color:#15803D;font-weight:600"></div>
+        <div id="importPreview" style="margin-top:14px"></div>
+      </div>
+
+      <!-- TAB: MANUAL EDIT -->
+      <div id="tabManualContent" style="display:none">
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
+          <div class="fg" style="max-width:220px">
+            <label class="flt">اختار الشهر للتعديل</label>
+            <select id="editMonth"></select>
+          </div>
+          <div style="padding-top:20px">
+            <button class="btn btn-ghost" onclick="addNewMonthFromManual()">+ إضافة شهر جديد</button>
+          </div>
+        </div>
+        <div style="overflow-x:auto;margin-bottom:16px">
+          <table class="adm-table">
+            <thead><tr>
+              <th>المتغير</th><th style="min-width:160px">القيمة الحالية</th><th style="min-width:160px">القيمة الجديدة</th>
+            </tr></thead>
+            <tbody id="manualFields"></tbody>
+          </table>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-or" onclick="saveManualEdits()">💾 حفظ التعديلات</button>
+          <button class="btn btn-ghost" onclick="resetManualFields()">↩ إعادة تعيين</button>
+        </div>
+      </div>
+
+      <!-- TAB: ADD MONTH -->
+      <div id="tabAddMonthContent" style="display:none">
+        <p style="font-size:13px;color:var(--muted);margin:0 0 16px">أضف شهر جديد بالكامل للداشبورد — اكتب اسم الشهر والأرقام بتاعته.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px" id="addMonthFields"></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-green" onclick="saveNewMonth()">✅ إضافة الشهر</button>
+          <button class="btn btn-ghost" onclick="clearAddMonth()">↩ مسح</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ SCRIPT ══════════ -->
+<script>
+// ═══════════════════════════════════════════════════════════
+// DATA STORE
+// ═══════════════════════════════════════════════════════════
+let DB = {
+  months: {
+    "January 2026":  {orders:42848, avgDailyOrders:1382.19, vendorFR:0.9906, tlbFunded:15.674, vendorFunded:24.673, fundedPct:35.708, gmv:11434184, avgDailyGmv:368844.65, tgo:93.612, aov:266.85, afv:249.90, avgDelFee:15.749, chains:88,  vendors:107},
+    "February 2026": {orders:35354, avgDailyOrders:1262.64, vendorFR:1.1831, tlbFunded:14.264, vendorFunded:26.605, fundedPct:36.480, gmv:9626099,  avgDailyGmv:343789.25, tgo:93.528, aov:272.28, afv:257.25, avgDelFee:16.010, chains:90,  vendors:110},
+    "March 2026":    {orders:38564, avgDailyOrders:1244.00, vendorFR:1.3696, tlbFunded:12.745, vendorFunded:25.477, fundedPct:34.843, gmv:11978314, avgDailyGmv:386397.22, tgo:91.160, aov:310.61, afv:290.56, avgDelFee:18.154, chains:83,  vendors:99},
+    "April 2026":    {orders:41201, avgDailyOrders:1373.37, vendorFR:1.2069, tlbFunded:13.017, vendorFunded:26.834, fundedPct:36.383, gmv:12281679, avgDailyGmv:409389.30, tgo:91.175, aov:298.09, afv:275.52, avgDelFee:17.736, chains:95,  vendors:123},
+    "May 2026":      {orders:52150, avgDailyOrders:1682.26, vendorFR:0.8159, tlbFunded:14.113, vendorFunded:28.215, fundedPct:37.847, gmv:16306539, avgDailyGmv:526017.38, tgo:92.754, aov:312.69, afv:292.94, avgDelFee:16.366, chains:92,  vendors:109},
+    "June 2026":     {orders:58067, avgDailyOrders:1935.57, vendorFR:0.8829, tlbFunded:17.003, vendorFunded:39.136, fundedPct:47.028, gmv:19710709, avgDailyGmv:657023.65, tgo:93.313, aov:339.45, afv:319.33, avgDelFee:17.426, chains:123, vendors:175},
+    "July 2026":     {orders:66551, avgDailyOrders:2146.81, vendorFR:1.0597, tlbFunded:21.052, vendorFunded:43.479, fundedPct:51.765, gmv:23859009, avgDailyGmv:769645.44, tgo:92.301, aov:358.51, afv:338.72, avgDelFee:18.197, chains:142, vendors:188},
+    "August 2026":   {orders:72795, avgDailyOrders:2348.23, vendorFR:1.0184, tlbFunded:21.070, vendorFunded:42.434, fundedPct:50.920, gmv:25763124, avgDailyGmv:831068.53, tgo:92.322, aov:353.91, afv:333.87, avgDelFee:18.684, chains:146, vendors:189},
+  },
+  chains: [
+    {name:"talabat mart",orders:68207,gmv:28093416,avgDailyOrders:370.69,ordersPct:16.74,vendorFR:0.437,tlbFunded:35.678,vendorFunded:66.436,fundedPct:75.316,avgDailyGmv:148642,tgo:100,aov:411.88,afv:397.04,avgDelFee:15.97},
+    {name:"B.LABAN",orders:46428,gmv:11083135,avgDailyOrders:191.06,ordersPct:11.39,vendorFR:0.385,tlbFunded:19.340,vendorFunded:9.154,fundedPct:26.926,avgDailyGmv:44690,tgo:100,aov:238.72,afv:225.12,avgDelFee:9.09},
+    {name:"karam el sham",orders:27483,gmv:9483940,avgDailyOrders:113.10,ordersPct:6.74,vendorFR:0.751,tlbFunded:13.110,vendorFunded:33.086,fundedPct:42.710,avgDailyGmv:38242,tgo:100,aov:345.08,afv:317.46,avgDelFee:22.51},
+    {name:"Konafa w basbosa",orders:26427,gmv:4588605,avgDailyOrders:108.75,ordersPct:6.48,vendorFR:0.463,tlbFunded:18.912,vendorFunded:55.822,fundedPct:63.776,avgDailyGmv:18502,tgo:100,aov:173.63,afv:161.00,avgDelFee:8.98},
+    {name:"BIM",orders:22362,gmv:5668592,avgDailyOrders:92.02,ordersPct:5.49,vendorFR:0.429,tlbFunded:31.035,vendorFunded:54.584,fundedPct:65.508,avgDailyGmv:22857,tgo:100,aov:253.49,afv:257.73,avgDelFee:11.10},
+    {name:"Fokhara",orders:10944,gmv:4539474,avgDailyOrders:45.04,ordersPct:2.69,vendorFR:0.663,tlbFunded:10.471,vendorFunded:52.796,fundedPct:60.325,avgDailyGmv:18304,tgo:100,aov:414.79,afv:390.53,avgDelFee:24.55},
+    {name:"KFC",orders:10811,gmv:5339182,avgDailyOrders:44.49,ordersPct:2.65,vendorFR:2.040,tlbFunded:1.239,vendorFunded:69.429,fundedPct:69.670,avgDailyGmv:21529,tgo:0,aov:493.87,afv:435.76,avgDelFee:50.85},
+    {name:"Koshary Mix",orders:10004,gmv:1460159,avgDailyOrders:41.17,ordersPct:2.45,vendorFR:1.311,tlbFunded:10.616,vendorFunded:5.268,fundedPct:15.414,avgDailyGmv:5888,tgo:100,aov:145.96,afv:132.46,avgDelFee:9.34},
+    {name:"Awlad Safwat Roasters",orders:9224,gmv:2132943,avgDailyOrders:37.96,ordersPct:2.26,vendorFR:2.391,tlbFunded:5.171,vendorFunded:10.820,fundedPct:15.742,avgDailyGmv:8601,tgo:100,aov:231.24,afv:206.72,avgDelFee:18.73},
+    {name:"Hassan Fresh Juice",orders:8831,gmv:1724023,avgDailyOrders:36.34,ordersPct:2.17,vendorFR:0.402,tlbFunded:7.462,vendorFunded:8.583,fundedPct:15.819,avgDailyGmv:6952,tgo:100,aov:195.22,afv:179.32,avgDelFee:9.94},
+    {name:"Khawater Demeshqia",orders:7745,gmv:3031389,avgDailyOrders:31.87,ordersPct:1.90,vendorFR:0.693,tlbFunded:6.495,vendorFunded:33.209,fundedPct:38.373,avgDailyGmv:12223,tgo:100,aov:391.40,afv:356.53,avgDelFee:22.65},
+    {name:"Mecca Juice",orders:7350,gmv:1432850,avgDailyOrders:30.25,ordersPct:1.80,vendorFR:0.708,tlbFunded:6.136,vendorFunded:36.313,fundedPct:40.082,avgDailyGmv:5778,tgo:100,aov:194.95,afv:191.73,avgDelFee:10.04},
+    {name:"Kebdet Samy",orders:6506,gmv:1222064,avgDailyOrders:26.77,ordersPct:1.60,vendorFR:0.710,tlbFunded:5.918,vendorFunded:0.0,fundedPct:5.918,avgDailyGmv:4928,tgo:100,aov:187.84,afv:157.49,avgDelFee:21.58},
+    {name:"Pizza Queen",orders:6080,gmv:3232242,avgDailyOrders:25.02,ordersPct:1.49,vendorFR:0.444,tlbFunded:9.967,vendorFunded:79.309,fundedPct:80.609,avgDailyGmv:13033,tgo:100,aov:531.62,afv:504.95,avgDelFee:9.55},
+    {name:"Fluckiger",orders:5041,gmv:1829472,avgDailyOrders:20.74,ordersPct:1.24,vendorFR:2.638,tlbFunded:10.811,vendorFunded:22.396,fundedPct:29.895,avgDailyGmv:7377,tgo:99.70,aov:362.92,afv:349.94,avgDelFee:9.76},
+    {name:"Mumo",orders:4962,gmv:1943336,avgDailyOrders:20.42,ordersPct:1.22,vendorFR:0.742,tlbFunded:12.495,vendorFunded:34.381,fundedPct:42.765,avgDailyGmv:7836,tgo:100,aov:391.64,afv:361.50,avgDelFee:23.30},
+    {name:"CHICKY",orders:4382,gmv:2103282,avgDailyOrders:18.03,ordersPct:1.08,vendorFR:0.822,tlbFunded:6.915,vendorFunded:22.227,fundedPct:26.746,avgDailyGmv:8481,tgo:52.24,aov:479.98,afv:433.34,avgDelFee:36.69},
+    {name:"Hawawshino",orders:2787,gmv:966251,avgDailyOrders:11.47,ordersPct:0.68,vendorFR:1.003,tlbFunded:13.563,vendorFunded:33.907,fundedPct:42.985,avgDailyGmv:3896,tgo:100,aov:346.70,afv:319.81,avgDelFee:23.08},
+    {name:"Smash It",orders:2002,gmv:736696,avgDailyOrders:13.26,ordersPct:0.49,vendorFR:0.923,tlbFunded:7.193,vendorFunded:27.073,fundedPct:31.668,avgDailyGmv:2971,tgo:100,aov:367.98,afv:332.60,avgDelFee:22.98},
+    {name:"Feteer Am Hasan",orders:1797,gmv:619197,avgDailyOrders:11.75,ordersPct:0.44,vendorFR:1.697,tlbFunded:5.843,vendorFunded:75.682,fundedPct:76.683,avgDailyGmv:3919,tgo:100,aov:344.57,afv:345.26,avgDelFee:22.72},
+  ]
+};
+
+// Derived helpers
+function getMonthList(){ return Object.keys(DB.months) }
+function grandTotal(){
+  const ms=Object.values(DB.months);
+  const n=ms.length||1;
+  return {
+    orders:ms.reduce((s,m)=>s+m.orders,0),
+    gmv:ms.reduce((s,m)=>s+m.gmv,0),
+    avgDailyOrders:ms.reduce((s,m)=>s+m.avgDailyOrders,0)/n,
+    avgDailyGmv:ms.reduce((s,m)=>s+m.avgDailyGmv,0)/n,
+    tgo:ms.reduce((s,m)=>s+m.tgo,0)/n,
+    aov:ms.reduce((s,m)=>s+m.aov,0)/n,
+    afv:ms.reduce((s,m)=>s+m.afv,0)/n,
+    avgDelFee:ms.reduce((s,m)=>s+m.avgDelFee,0)/n,
+    fundedPct:ms.reduce((s,m)=>s+m.fundedPct,0)/n,
+    tlbFunded:ms.reduce((s,m)=>s+m.tlbFunded,0)/n,
+    vendorFunded:ms.reduce((s,m)=>s+m.vendorFunded,0)/n,
+    vendorFR:ms.reduce((s,m)=>s+m.vendorFR,0)/n,
+    chains:Math.max(...ms.map(m=>m.chains)),
+    vendors:Math.max(...ms.map(m=>m.vendors)),
+  };
+}
+function getD(month){ return month==='All'?grandTotal():DB.months[month]||grandTotal() }
+
+// ─── HELPERS ──────────────────────────────────────────────
+const fmt=(n,d=0)=>(+n||0).toLocaleString('en-US',{maximumFractionDigits:d});
+const fmtK=n=>n>=1e6?(n/1e6).toFixed(2)+'M':n>=1e3?(n/1e3).toFixed(1)+'K':fmt(n);
+const p=n=>(+n||0).toFixed(2)+'%';
+const egp=n=>'EGP '+fmtK(n);
+function momDelta(m,k){
+  const ml=getMonthList(),i=ml.indexOf(m);
+  if(i<=0)return null;
+  const c=DB.months[m][k],pv=DB.months[ml[i-1]][k];
+  return(c-pv)/pv*100;
+}
+function badge(v,abs=false){
+  if(v===null)return'<span class="badge neu">YTD</span>';
+  const pos=v>=0,d=abs?(pos?'+':'')+Math.round(v):(pos?'+':'')+v.toFixed(1)+'%';
+  return`<span class="badge ${pos?'up':'dn'}">${pos?'▲':'▼'} ${d}</span>`;
+}
+function showToast(msg='✅ Saved!'){
+  const t=document.getElementById('toast');t.textContent=msg;t.style.display='block';
+  setTimeout(()=>t.style.display='none',2800);
+}
+
+// ─── STATE ────────────────────────────────────────────────
+let macroCI=null,donutI=null,barI=null,modalCI=null,currentMetric='both';
+
+// ─── METRIC CONFIG ────────────────────────────────────────
+const MC={
+  orders:       {label:'Successful Orders',   fmt:v=>fmt(v),     unit:'orders', color:'#FF5A00',type:'bar'},
+  gmv:          {label:'GMV',                 fmt:v=>egp(v),     unit:'EGP',    color:'#4A3525',type:'line'},
+  avgDailyOrders:{label:'Avg Daily Orders',   fmt:v=>fmt(v,0),   unit:'ord/day',color:'#FF7A30',type:'line'},
+  avgDailyGmv:  {label:'Avg Daily GMV',       fmt:v=>egp(v),     unit:'EGP/day',color:'#7A5C42',type:'bar'},
+  aov:          {label:'AOV',                 fmt:v=>'EGP '+fmt(v,2),unit:'EGP',color:'#0D7377',type:'line'},
+  afv:          {label:'AFV',                 fmt:v=>'EGP '+fmt(v,2),unit:'EGP',color:'#14A085',type:'line'},
+  avgDelFee:    {label:'Avg Delivery Fee',    fmt:v=>'EGP '+fmt(v,2),unit:'EGP',color:'#E05A00',type:'bar'},
+  fundedPct:    {label:'Funded Orders %',     fmt:v=>p(v),       unit:'%',      color:'#FF5A00',type:'line'},
+  tlbFunded:    {label:'TLB Funded %',        fmt:v=>p(v),       unit:'%',      color:'#CC4400',type:'bar'},
+  vendorFunded: {label:'Vendor Funded %',     fmt:v=>p(v),       unit:'%',      color:'#7A5C42',type:'bar'},
+  vendorFR:     {label:'Vendor FR %',         fmt:v=>p(v),       unit:'%',      color:'#A16207',type:'line'},
+  tgo:          {label:'TGO Share %',         fmt:v=>p(v),       unit:'%',      color:'#0D7377',type:'bar'},
+  chains:       {label:'Active Chains',       fmt:v=>fmt(v),     unit:'chains', color:'#FF5A00',type:'bar'},
+  vendors:      {label:'Active Vendors',      fmt:v=>fmt(v),     unit:'vendors',color:'#4A3525',type:'bar'},
+};
+
+// ─── BUILD MONTH SELECT ────────────────────────────────────
+function buildMonthSelect(){
+  const s=document.getElementById('globalMonth');
+  const prev=s.value;
+  s.innerHTML='<option value="All">All Months</option>';
+  getMonthList().forEach(m=>{const o=document.createElement('option');o.value=m;o.textContent=m;s.appendChild(o)});
+  if(prev)s.value=prev;
+}
+
+// ─── HERO KPIs ────────────────────────────────────────────
+function buildHeroKPIs(month){
+  const d=getD(month),ml=getMonthList(),isM=month!=='All'&&ml.indexOf(month)>0;
+  const items=[
+    {key:'orders',label:'Successful Orders',val:fmt(d.orders),ch:isM?momDelta(month,'orders'):null,grad:'or-grad'},
+    {key:'gmv',label:'GMV',val:'EGP '+fmtK(d.gmv),ch:isM?momDelta(month,'gmv'):null,grad:'br-grad'},
+    {key:'chains',label:'Active Chains',val:d.chains,ch:isM?d.chains-DB.months[ml[ml.indexOf(month)-1]].chains:null,grad:'dk-grad',abs:true},
+    {key:'vendors',label:'Active Vendors',val:d.vendors,ch:isM?d.vendors-DB.months[ml[ml.indexOf(month)-1]].vendors:null,grad:'tl-grad',abs:true},
+  ];
+  document.getElementById('hero-kpis').innerHTML=items.map(c=>`
+    <div class="kpi-click ${c.grad}" onclick="openKpiModal('${c.key}','${month}')">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+        <span style="font-size:10px;font-weight:700;opacity:.7;text-transform:uppercase;letter-spacing:.07em">${c.label}</span>
+        ${c.ch!==null?badge(c.ch,c.abs||false):'<span class="badge neu">YTD</span>'}
+      </div>
+      <div style="font-size:25px;font-weight:900;line-height:1;margin-bottom:6px">${c.val}</div>
+      <div class="hint">TAP FOR DETAILS →</div>
+    </div>`).join('');
+  const sec=[
+    {key:'avgDailyOrders',label:'Avg Daily Orders',val:fmt(d.avgDailyOrders,0)},
+    {key:'avgDailyGmv',label:'Avg Daily GMV',val:egp(d.avgDailyGmv)},
+    {key:'aov',label:'AOV',val:'EGP '+fmt(d.aov,2)},
+    {key:'afv',label:'AFV',val:'EGP '+fmt(d.afv,2)},
+    {key:'avgDelFee',label:'Avg Del. Fee',val:'EGP '+fmt(d.avgDelFee,2)},
+    {key:'fundedPct',label:'Funded %',val:p(d.fundedPct)},
+    {key:'tlbFunded',label:'TLB Funded %',val:p(d.tlbFunded)},
+    {key:'vendorFunded',label:'Vendor Funded %',val:p(d.vendorFunded)},
+    {key:'vendorFR',label:'Vendor FR %',val:p(d.vendorFR)},
+    {key:'tgo',label:'TGO Share %',val:p(d.tgo)},
+  ];
+  document.getElementById('sec-kpis').innerHTML=sec.map(s=>`
+    <div class="kpi-pill" onclick="openKpiModal('${s.key}','${month}')">
+      <div style="font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">${s.label}</div>
+      <div style="font-size:16px;font-weight:900;color:var(--br)">${s.val}</div>
+    </div>`).join('');
+  document.getElementById('hdr-chains').textContent=d.chains;
+  document.getElementById('hdr-vendors').textContent=d.vendors;
+}
+
+// ─── MACRO CHART ──────────────────────────────────────────
+function buildMacroChart(month){
+  const ml=getMonthList();
+  const slice=month==='All'?ml:ml.slice(0,ml.indexOf(month)+1);
+  const labels=slice.map(m=>m.replace(' 2026','').slice(0,3));
+  const ord=slice.map(m=>DB.months[m].orders);
+  const gm=slice.map(m=>DB.months[m].gmv/1e6);
+  document.getElementById('macroChartTitle').textContent=month==='All'?'Orders vs GMV – All Months':'Orders vs GMV – up to '+month;
+  const so=currentMetric==='orders'||currentMetric==='both';
+  const sg=currentMetric==='gmv'||currentMetric==='both';
+  const ctx=document.getElementById('macroChart').getContext('2d');
+  if(macroCI)macroCI.destroy();
+  macroCI=new Chart(ctx,{data:{labels,datasets:[
+    {type:'bar',label:'Successful Orders',data:ord,backgroundColor:'rgba(255,90,0,.85)',borderRadius:6,yAxisID:'y',hidden:!so,order:2},
+    {type:'line',label:'GMV (EGP M)',data:gm,borderColor:'#4A3525',backgroundColor:'rgba(74,53,37,.07)',borderWidth:3,pointBackgroundColor:'#4A3525',pointRadius:5,tension:.4,fill:true,yAxisID:'y2',hidden:!sg,order:1}
+  ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+    plugins:{legend:{position:'top',labels:{font:{family:'Inter',size:12},padding:14,usePointStyle:true}},
+      tooltip:{backgroundColor:'#fff',titleColor:'#4A3525',bodyColor:'#4A3525',borderColor:'#EDE8E2',borderWidth:1,padding:10,
+        callbacks:{label:c=>c.dataset.label.includes('GMV')?' GMV: EGP '+c.parsed.y.toFixed(2)+'M':' Orders: '+c.parsed.y.toLocaleString()}}},
+    scales:{x:{grid:{display:false},ticks:{font:{family:'Inter',size:11},color:'#9B8B7A'}},
+      y:{position:'left',title:{display:true,text:'Orders',font:{family:'Inter',size:11},color:'#FF5A00'},grid:{color:'#EDE8E2'},ticks:{font:{family:'Inter',size:11},color:'#9B8B7A',callback:v=>v.toLocaleString()}},
+      y2:{position:'right',title:{display:true,text:'GMV (M)',font:{family:'Inter',size:11},color:'#4A3525'},grid:{display:false},ticks:{font:{family:'Inter',size:11},color:'#9B8B7A',callback:v=>v.toFixed(1)+'M'}}}}});
+}
+function setMetric(m){
+  currentMetric=m;
+  ['btnBoth','btnOrders','btnGmv'].forEach(id=>document.getElementById(id).classList.remove('active'));
+  document.getElementById({both:'btnBoth',orders:'btnOrders',gmv:'btnGmv'}[m]).classList.add('active');
+  buildMacroChart(document.getElementById('globalMonth').value);
+}
+
+// ─── RESTO KPIs ───────────────────────────────────────────
+function buildRestoKPIs(d,month){
+  const items=[
+    {key:'orders',label:'Orders',val:fmt(d.orders)},
+    {key:'gmv',label:'GMV',val:egp(d.gmv)},
+    {key:'avgDailyOrders',label:'Avg Daily Orders',val:fmt(d.avgDailyOrders,0)},
+    {key:'avgDailyGmv',label:'Avg Daily GMV',val:egp(d.avgDailyGmv)},
+    {key:'aov',label:'AOV',val:'EGP '+fmt(d.aov,2)},
+    {key:'afv',label:'AFV',val:'EGP '+fmt(d.afv,2)},
+    {key:'avgDelFee',label:'Avg Del. Fee',val:'EGP '+fmt(d.avgDelFee,2)},
+    {key:'fundedPct',label:'Funded %',val:p(d.fundedPct)},
+    {key:'tlbFunded',label:'TLB Funded %',val:p(d.tlbFunded)},
+    {key:'vendorFunded',label:'Vendor Funded %',val:p(d.vendorFunded)},
+    {key:'vendorFR',label:'Vendor FR %',val:p(d.vendorFR)},
+    {key:'tgo',label:'TGO Share %',val:p(d.tgo)},
+  ];
+  document.getElementById('resto-kpis').innerHTML=items.map(s=>`
+    <div class="kpi-pill" onclick="openKpiModal('${s.key}','${month}')">
+      <div style="font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">${s.label}</div>
+      <div style="font-size:15px;font-weight:900;color:var(--br)">${s.val}</div>
+    </div>`).join('');
+}
+
+// ─── DONUT & BAR ──────────────────────────────────────────
+function buildDonut(d){
+  const fd=+d.fundedPct||0,nfd=Math.max(0,100-fd);
+  const ctx=document.getElementById('donutChart').getContext('2d');
+  if(donutI)donutI.destroy();
+  donutI=new Chart(ctx,{type:'doughnut',data:{labels:['Funded','Non-Funded'],datasets:[{data:[fd,nfd],backgroundColor:['#FF5A00','#EDE8E2'],borderColor:['#FF5A00','#D0C8BF'],borderWidth:2,hoverOffset:8}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'68%',plugins:{legend:{display:false},tooltip:{backgroundColor:'#fff',titleColor:'#4A3525',bodyColor:'#4A3525',borderColor:'#EDE8E2',borderWidth:1,padding:10,callbacks:{label:c=>' '+c.label+': '+c.parsed.toFixed(1)+'%'}}}}});
+  document.getElementById('donutLegend').innerHTML=`
+    <span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:#FF5A00;display:inline-block"></span>Funded ${fd.toFixed(1)}%</span>
+    <span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:#EDE8E2;border:1px solid #ccc;display:inline-block"></span>Non-Funded ${nfd.toFixed(1)}%</span>
+    <span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:#FF7A30;display:inline-block"></span>TLB ${(+d.tlbFunded||0).toFixed(1)}%</span>`;
+}
+function buildBar(sel,month){
+  const gtOrders=grandTotal().orders||1;
+  const scale=month!=='All'?(DB.months[month]?.orders||gtOrders)/gtOrders:1;
+  const rows=[...DB.chains].map(c=>({name:c.name,orders:Math.round(c.orders*scale)})).sort((a,b)=>b.orders-a.orders).slice(0,10);
+  if(sel!=='__all__'&&!rows.find(r=>r.name===sel)){const f=DB.chains.find(c=>c.name===sel);if(f)rows.push({name:f.name,orders:Math.round(f.orders*scale)})}
+  const ctx=document.getElementById('barChart').getContext('2d');
+  if(barI)barI.destroy();
+  barI=new Chart(ctx,{type:'bar',data:{labels:rows.map(r=>r.name.length>16?r.name.slice(0,15)+'…':r.name),datasets:[{label:'Orders',data:rows.map(r=>r.orders),backgroundColor:rows.map(r=>r.name===sel?'#FF5A00':'rgba(74,53,37,.18)'),borderColor:rows.map(r=>r.name===sel?'#CC4700':'rgba(74,53,37,.35)'),borderWidth:1.5,borderRadius:6}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#fff',titleColor:'#4A3525',bodyColor:'#4A3525',borderColor:'#EDE8E2',borderWidth:1,padding:10,callbacks:{label:c=>' Orders: '+c.parsed.x.toLocaleString()}}},
+      scales:{x:{grid:{color:'#EDE8E2'},ticks:{font:{family:'Inter',size:11},color:'#9B8B7A',callback:v=>v.toLocaleString()}},y:{grid:{display:false},ticks:{font:{family:'Inter',size:11},color:'#4A3525'}}}}});
+  document.getElementById('compTitle').textContent='Top Restaurants – '+(month==='All'?'All Months':month);
+}
+
+// ─── TABLE ────────────────────────────────────────────────
+let tableData=[];
+function buildTable(month){
+  const gtOrders=grandTotal().orders||1;
+  const scale=month!=='All'?(DB.months[month]?.orders||gtOrders)/gtOrders:1;
+  tableData=[...DB.chains].map(c=>({...c,orders:Math.round(c.orders*scale),gmv:c.gmv*scale,avgDailyGmv:c.avgDailyGmv*scale})).sort((a,b)=>b.orders-a.orders);
+  renderTable();
+}
+function renderTable(){
+  const q=document.getElementById('tableSearch').value.toLowerCase();
+  const f=tableData.filter(r=>r.name.toLowerCase().includes(q));
+  document.getElementById('tableCount').textContent=`Showing ${f.length} of ${tableData.length} restaurants`;
+  const cols=['#','Restaurant','Orders','GMV','AOV','AFV','Del. Fee','Funded %','TLB Fd%','Vnd Fd%','TGO%'];
+  document.getElementById('tableHead').innerHTML=cols.map(c=>`<th style="font-size:11px">${c}</th>`).join('');
+  document.getElementById('tableBody').innerHTML=f.map((r,i)=>`
+    <tr style="border-bottom:1px solid var(--bdr);${i%2===0?'background:#FDFCFB':''}">
+      <td style="padding:7px 10px;color:var(--muted)">${i+1}</td>
+      <td style="padding:7px 10px;font-weight:700;color:var(--br);max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.name}</td>
+      <td style="padding:7px 10px;text-align:right;font-weight:800;color:var(--or)">${fmt(r.orders)}</td>
+      <td style="padding:7px 10px;text-align:right">${egp(r.gmv)}</td>
+      <td style="padding:7px 10px;text-align:right">${fmt(r.aov,0)}</td>
+      <td style="padding:7px 10px;text-align:right">${fmt(r.afv,0)}</td>
+      <td style="padding:7px 10px;text-align:right">${fmt(r.avgDelFee,1)}</td>
+      <td style="padding:7px 10px;text-align:right"><span style="background:${r.fundedPct>50?'#DCFCE7':r.fundedPct>30?'#FEF9C3':'#FEE2E2'};color:${r.fundedPct>50?'#15803D':r.fundedPct>30?'#A16207':'#DC2626'};padding:2px 7px;border-radius:999px;font-weight:700;font-size:11px">${p(r.fundedPct)}</span></td>
+      <td style="padding:7px 10px;text-align:right">${p(r.tlbFunded)}</td>
+      <td style="padding:7px 10px;text-align:right">${p(r.vendorFunded)}</td>
+      <td style="padding:7px 10px;text-align:right">${p(r.tgo)}</td>
+    </tr>`).join('');
+}
+
+// ─── CHAIN FILTER ─────────────────────────────────────────
+function buildChainFilter(){
+  const s=document.getElementById('filterChain');
+  const prev=s.value;
+  s.innerHTML='<option value="__all__">🍽️ All Restaurants</option>';
+  DB.chains.forEach(c=>{const o=document.createElement('option');o.value=c.name;o.textContent=c.name;s.appendChild(o)});
+  if(prev)s.value=prev;
+}
+function getRestoD(chain,month){
+  if(chain==='__all__')return getD(month);
+  const r=DB.chains.find(c=>c.name===chain);if(!r)return null;
+  const gtOrders=grandTotal().orders||1;
+  const scale=month!=='All'?(DB.months[month]?.orders||gtOrders)/gtOrders:1;
+  return{...r,orders:Math.round(r.orders*scale),gmv:r.gmv*scale,avgDailyGmv:r.avgDailyGmv*scale};
+}
+
+// ─── KPI MODAL ────────────────────────────────────────────
+function openKpiModal(key,month){
+  const cfg=MC[key];if(!cfg)return;
+  const ml=getMonthList();
+  document.getElementById('modalEyebrow').textContent=month==='All'?'All Months':month;
+  document.getElementById('modalTitle').textContent=cfg.label;
+  const vals=ml.map(m=>DB.months[m][key]);
+  const curVal=month==='All'?grandTotal()[key]:DB.months[month]?.[key];
+  const maxVal=Math.max(...vals),minVal=Math.min(...vals);
+  const maxM=ml[vals.indexOf(maxVal)].replace(' 2026','');
+  const minM=ml[vals.indexOf(minVal)].replace(' 2026','');
+  const mom=month!=='All'&&ml.indexOf(month)>0?momDelta(month,key):null;
+  document.getElementById('modalStats').innerHTML=`
+    <div class="stat-chip" style="text-align:center">
+      <div style="font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">${month==='All'?'Grand Total':'Selected Month'}</div>
+      <div style="font-size:20px;font-weight:900;color:var(--br)">${cfg.fmt(curVal)}</div>
+    </div>
+    ${mom!==null?`<div class="stat-chip" style="text-align:center"><div style="font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">MoM Change</div><div style="font-size:20px;font-weight:900">${badge(mom)}</div></div>`:''}
+    <div class="stat-chip" style="text-align:center"><div style="font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">Peak</div><div style="font-size:15px;font-weight:900;color:#15803D">${maxM}</div><div style="font-size:11px;color:var(--muted)">${cfg.fmt(maxVal)}</div></div>
+    <div class="stat-chip" style="text-align:center"><div style="font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">Lowest</div><div style="font-size:15px;font-weight:900;color:#DC2626">${minM}</div><div style="font-size:11px;color:var(--muted)">${cfg.fmt(minVal)}</div></div>`;
+  const selIdx=month!=='All'?ml.indexOf(month):-1;
+  const ctx=document.getElementById('modalChart').getContext('2d');
+  if(modalCI)modalCI.destroy();
+  modalCI=new Chart(ctx,{type:cfg.type,data:{labels:ml.map(m=>m.replace(' 2026','').slice(0,3)),datasets:[{label:cfg.label,data:vals,
+    backgroundColor:cfg.type==='bar'?ml.map((_,i)=>i===selIdx?cfg.color:cfg.color+'44'):cfg.color+'22',
+    borderColor:cfg.color,borderWidth:cfg.type==='line'?3:0,borderRadius:cfg.type==='bar'?6:0,
+    pointBackgroundColor:ml.map((_,i)=>i===selIdx?'#fff':cfg.color),pointBorderColor:cfg.color,
+    pointRadius:cfg.type==='line'?ml.map((_,i)=>i===selIdx?7:5):0,pointBorderWidth:cfg.type==='line'?ml.map((_,i)=>i===selIdx?3:1.5):0,
+    fill:cfg.type==='line',tension:.4}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#fff',titleColor:'#4A3525',bodyColor:'#4A3525',borderColor:'#EDE8E2',borderWidth:1,padding:10,callbacks:{label:c=>' '+cfg.label+': '+cfg.fmt(c.parsed.y)}}},
+      scales:{x:{grid:{display:false},ticks:{font:{family:'Inter',size:12},color:'#9B8B7A'}},
+        y:{grid:{color:'#EDE8E2'},ticks:{font:{family:'Inter',size:11},color:'#9B8B7A',callback:v=>{if(cfg.unit.includes('%'))return(+v).toFixed(1)+'%';if(cfg.unit.includes('EGP'))return'EGP '+fmtK(v);return v.toLocaleString()}}}}}});
+  const trend=vals[vals.length-1]>vals[0]?`📈 ارتفع من ${cfg.fmt(vals[0])} إلى ${cfg.fmt(vals[vals.length-1])}`:`📉 انخفض من ${cfg.fmt(vals[0])} إلى ${cfg.fmt(vals[vals.length-1])}`;
+  document.getElementById('modalInsight').innerHTML=`<div style="display:flex;gap:8px;align-items:flex-start"><span style="font-size:16px">💡</span><p style="margin:0;font-size:13px;color:var(--br);line-height:1.6">${trend} خلال الفترة. أعلى قيمة كانت في <strong>${maxM}</strong> بـ ${cfg.fmt(maxVal)}، وأدنى قيمة كانت في <strong>${minM}</strong> بـ ${cfg.fmt(minVal)}.</p></div>`;
+  document.getElementById('kpiModal').classList.add('open');
+  document.body.style.overflow='hidden';
+}
+function closeKpiModal(e){if(e&&e.target!==document.getElementById('kpiModal'))return;document.getElementById('kpiModal').classList.remove('open');document.body.style.overflow='';}
+
+// ─── ADMIN PANEL ──────────────────────────────────────────
+function openAdmin(){
+  buildAdminMonthSelect();
+  buildManualFields(document.getElementById('editMonth').value);
+  buildAddMonthFields();
+  document.getElementById('adminPanel').classList.add('open');
+  document.body.style.overflow='hidden';
+}
+function closeAdmin(e){if(e&&e.target!==document.getElementById('adminPanel'))return;document.getElementById('adminPanel').classList.remove('open');document.body.style.overflow='';}
+
+function switchAdminTab(tab){
+  ['import','manual','addmonth'].forEach(t=>{
+    document.getElementById('tab'+t.charAt(0).toUpperCase()+t.slice(1)+'Content').style.display=t===tab?'block':'none';
+    document.getElementById('tab'+t.charAt(0).toUpperCase()+t.slice(1)).classList.toggle('active',t===tab);
+  });
+}
+
+// ─── MANUAL EDIT ──────────────────────────────────────────
+const FIELD_LABELS={orders:'Successful Orders',gmv:'GMV (EGP)',avgDailyOrders:'Avg Daily Orders',avgDailyGmv:'Avg Daily GMV',aov:'AOV',afv:'AFV',avgDelFee:'Avg Delivery Fee',fundedPct:'Funded Orders %',tlbFunded:'TLB Funded %',vendorFunded:'Vendor Funded %',vendorFR:'Vendor FR %',tgo:'TGO Share %',chains:'Active Chains',vendors:'Active Vendors'};
+function buildAdminMonthSelect(){
+  const s=document.getElementById('editMonth');
+  const prev=s.value;
+  s.innerHTML='';
+  getMonthList().forEach(m=>{const o=document.createElement('option');o.value=m;o.textContent=m;s.appendChild(o)});
+  if(DB.months[prev])s.value=prev;else s.value=getMonthList().slice(-1)[0]||'';
+  s.onchange=()=>buildManualFields(s.value);
+}
+function buildManualFields(month){
+  if(!month||!DB.months[month])return;
+  const d=DB.months[month];
+  document.getElementById('manualFields').innerHTML=Object.entries(FIELD_LABELS).map(([k,lbl])=>`
+    <tr><td style="padding:7px 10px;font-weight:600;color:var(--br2)">${lbl}</td>
+    <td style="padding:7px 10px;color:var(--muted)">${(+d[k]||0).toLocaleString(undefined,{maximumFractionDigits:3})}</td>
+    <td style="padding:7px 10px"><input type="number" id="mf_${k}" placeholder="${(+d[k]||0)}" step="any"/></td></tr>`).join('');
+}
+function saveManualEdits(){
+  const month=document.getElementById('editMonth').value;
+  if(!month||!DB.months[month])return;
+  let changed=0;
+  Object.keys(FIELD_LABELS).forEach(k=>{
+    const el=document.getElementById('mf_'+k);
+    if(el&&el.value!==''){DB.months[month][k]=parseFloat(el.value);changed++}
+  });
+  if(changed>0){updateAll();showToast(`✅ تم حفظ ${changed} تغيير في ${month}`)}
+  else showToast('⚠️ لم يتم تغيير أي قيمة');
+}
+function resetManualFields(){buildManualFields(document.getElementById('editMonth').value)}
+
+// ─── ADD MONTH ────────────────────────────────────────────
+function buildAddMonthFields(){
+  const last=DB.months[getMonthList().slice(-1)[0]]||{};
+  document.getElementById('addMonthFields').innerHTML=`
+    <div style="grid-column:1/-1">
+      <label class="flt">اسم الشهر (مثال: September 2026)</label>
+      <input type="text" id="newMonthName" placeholder="September 2026"/>
+    </div>
+    ${Object.entries(FIELD_LABELS).map(([k,lbl])=>`
+    <div>
+      <label class="flt">${lbl}</label>
+      <input type="number" id="nm_${k}" placeholder="${(+last[k]||0)}" step="any"/>
+    </div>`).join('')}`;
+}
+function saveNewMonth(){
+  const name=document.getElementById('newMonthName').value.trim();
+  if(!name){showToast('⚠️ اكتب اسم الشهر أولاً');return}
+  const newM={};let ok=true;
+  Object.keys(FIELD_LABELS).forEach(k=>{
+    const v=parseFloat(document.getElementById('nm_'+k).value);
+    if(isNaN(v)){ok=false}else{newM[k]=v}
+  });
+  if(!ok){showToast('⚠️ أدخل كل الأرقام');return}
+  DB.months[name]=newM;
+  buildMonthSelect();
+  buildChainFilter();
+  updateAll();
+  showToast(`✅ تم إضافة ${name} بنجاح`);
+  document.getElementById('newMonthName').value='';
+}
+function clearAddMonth(){buildAddMonthFields()}
+
+// ─── EXCEL/CSV IMPORT ─────────────────────────────────────
+function handleDrop(e){
+  e.preventDefault();
+  document.getElementById('dropZone').classList.remove('drag');
+  const f=e.dataTransfer.files[0];
+  if(f)processFile(f);
+}
+function handleFileInput(inp){if(inp.files[0])processFile(inp.files[0])}
+function processFile(file){
+  const ext=file.name.split('.').pop().toLowerCase();
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      let wb;
+      if(ext==='csv'){
+        wb=XLSX.read(e.target.result,{type:'string'});
+      } else {
+        wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+      }
+      let importedMonths=0,importedChains=0;
+
+      // Try Growth mom sheet
+      const macroSheet=wb.Sheets['Growth mom']||wb.Sheets[wb.SheetNames[0]];
+      if(macroSheet){
+        const rows=XLSX.utils.sheet_to_json(macroSheet,{defval:0});
+        rows.forEach(row=>{
+          // detect month column (first column with text that isn't 'Grand Total')
+          const monthKey=Object.keys(row).find(k=>typeof row[k]==='string'&&row[k]&&row[k]!=='Grand Total');
+          const month=monthKey?row[monthKey]:'';
+          if(!month||month==='Grand Total')return;
+          DB.months[month]={
+            orders:+row['Successful']||0,
+            avgDailyOrders:+row['Avg Daily Orders ']||+row['Avg Daily Orders']||0,
+            vendorFR:+row['Vendor FR %']||0,
+            tlbFunded:+row['Talabat Funded orders %']||0,
+            vendorFunded:+row['Vendor Funded Orders %']||0,
+            fundedPct:+row['Funded Orders %']||0,
+            gmv:+row['GMV']||0,
+            avgDailyGmv:+row['Avg. Daily GMV']||+row['Avg Daily GMV']||0,
+            tgo:+row['TGO share']||0,
+            aov:+row['AOV']||0,
+            afv:+row['AFV']||0,
+            avgDelFee:+row['Avg. Delivery Fees']||+row['Avg Delivery Fees']||0,
+            chains:+row['Number of Active Chains']||0,
+            vendors:+row['Number of Active Vendors']||0,
+          };
+          importedMonths++;
+        });
+      }
+
+      // Try Chains Contribution sheet
+      const chainSheet=wb.Sheets['Chains Contribution ']||wb.Sheets['Chains Contribution']||wb.Sheets[wb.SheetNames[1]];
+      if(chainSheet){
+        const rows=XLSX.utils.sheet_to_json(chainSheet,{defval:0});
+        const newChains=[];
+        rows.forEach(row=>{
+          const name=row['chain_name']||row['Chain Name']||row['name']||'';
+          if(!name||name==='Grand Total')return;
+          const orders=+row['Successful']||0;
+          if(orders===0)return;
+          newChains.push({
+            name,orders,
+            gmv:+row['GMV']||0,
+            avgDailyOrders:+row['Avg Daily Orders ']||+row['Avg Daily Orders']||0,
+            ordersPct:+row['Orders Contribution %']||0,
+            vendorFR:+row['Vendor FR %']||0,
+            tlbFunded:+row['Talabat Funded orders %']||0,
+            vendorFunded:+row['Vendor Funded Orders %']||0,
+            fundedPct:+row['Funded Orders %']||0,
+            avgDailyGmv:+row['Avg Daily GMV']||+row['Avg. Daily GMV']||0,
+            tgo:+row['TGO share']||0,
+            aov:+row['AOV']||0,
+            afv:+row['AFV']||0,
+            avgDelFee:+row['Avg. Delivery Fees']||+row['Avg Delivery Fees']||0,
+          });
+          importedChains++;
+        });
+        if(newChains.length>0)DB.chains=newChains.sort((a,b)=>b.orders-a.orders);
+      }
+
+      // Show preview
+      const status=document.getElementById('importStatus');
+      status.style.display='block';
+      status.innerHTML=`✅ تم قراءة الملف بنجاح! <strong>${importedMonths}</strong> شهر و<strong>${importedChains}</strong> مطعم.`;
+      showPreview(importedMonths,importedChains);
+      buildMonthSelect();buildChainFilter();updateAll();
+      showToast(`✅ تم استيراد ${importedMonths} شهر و${importedChains} مطعم`);
+    }catch(err){
+      document.getElementById('importStatus').style.display='block';
+      document.getElementById('importStatus').style.background='#FEF2F2';
+      document.getElementById('importStatus').style.borderColor='#FECACA';
+      document.getElementById('importStatus').style.color='#DC2626';
+      document.getElementById('importStatus').textContent='❌ خطأ في قراءة الملف: '+err.message;
+    }
+  };
+  if(ext==='csv')reader.readAsText(file);else reader.readAsArrayBuffer(file);
+}
+function showPreview(months,chains){
+  const ml=getMonthList();
+  document.getElementById('importPreview').innerHTML=`
+    <div style="margin-top:12px">
+      <p style="font-size:12px;font-weight:700;color:var(--br);margin:0 0 8px">معاينة الأشهر المستوردة:</p>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        ${ml.map(m=>`<span class="tag" style="background:#DCFCE7;color:#15803D;font-size:12px">${m}</span>`).join('')}
+      </div>
+      <p style="font-size:12px;font-weight:700;color:var(--br);margin:10px 0 6px">أعلى 5 مطاعم:</p>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        ${DB.chains.slice(0,5).map(c=>`<span class="tag" style="background:#E0F0FF;color:#1A5DA0;font-size:12px">${c.name} (${fmt(c.orders)})</span>`).join('')}
+      </div>
+    </div>`;
+}
+
+// ─── UPDATE ALL ───────────────────────────────────────────
+function updateAll(){
+  const month=document.getElementById('globalMonth').value;
+  const chain=document.getElementById('filterChain').value;
+  buildHeroKPIs(month);
+  buildMacroChart(month);
+  const rd=getRestoD(chain,month);
+  if(rd){buildRestoKPIs(rd,month);buildDonut(rd)}
+  buildBar(chain,month);
+  buildTable(month);
+  const ml=getMonthList();
+  document.getElementById('dataStamp').textContent=`Data: ${ml[0]||'—'} – ${ml[ml.length-1]||'—'} · Agamy Zone · Talabat Egypt · Last update: ${new Date().toLocaleDateString('en-GB')}`;
+  autoSaveToLocal();
+}
+
+// ─── SAVE / LOAD DATA ─────────────────────────────────────
+const STORAGE_KEY = 'agamy_dashboard_data';
+
+function saveDataToFile(){
+  const blob = new Blob([JSON.stringify(DB, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  const date = new Date().toISOString().slice(0,10);
+  a.download = `agamy_data_${date}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  // also save to localStorage as backup
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(DB)); } catch(e){}
+  showToast('💾 تم حفظ البيانات كـ JSON');
+}
+
+function loadDataFromFile(inp){
+  const file = inp.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const loaded = JSON.parse(e.target.result);
+      if(loaded.months && loaded.chains){
+        DB = loaded;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(DB));
+        buildMonthSelect(); buildChainFilter(); updateAll();
+        showToast('✅ تم تحميل البيانات بنجاح!');
+      } else {
+        showToast('❌ الملف مش بتاعنا — لازم يكون من "حفظ" في الداشبورد');
+      }
+    } catch(err){ showToast('❌ خطأ في قراءة الملف: ' + err.message); }
+  };
+  reader.readAsText(file);
+  inp.value = '';
+}
+
+function autoSaveToLocal(){
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(DB)); } catch(e){}
+}
+
+function loadFromLocal(){
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if(saved){ const p = JSON.parse(saved); if(p.months && p.chains){ DB = p; return true; } }
+  } catch(e){}
+  return false;
+}
+
+// ─── INIT ─────────────────────────────────────────────────
+// Try to restore last session from localStorage
+if(loadFromLocal()){ console.log('✅ Restored data from last session'); }
+buildMonthSelect();
+buildChainFilter();
+document.getElementById('globalMonth').addEventListener('change',updateAll);
+document.getElementById('filterChain').addEventListener('change',()=>{
+  const month=document.getElementById('globalMonth').value;
+  const chain=document.getElementById('filterChain').value;
+  const rd=getRestoD(chain,month);
+  if(rd){buildRestoKPIs(rd,month);buildDonut(rd)}
+  buildBar(chain,month);
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){
+    closeKpiModal({target:document.getElementById('kpiModal')});
+    closeAdmin({target:document.getElementById('adminPanel')});
+  }
+});
+// Default tab
+switchAdminTab('import');
+updateAll();
+</script>
+</body>
+</html>
